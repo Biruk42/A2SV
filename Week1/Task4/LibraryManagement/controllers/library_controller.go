@@ -29,7 +29,8 @@ func (c *LibraryController) Run() {
 		fmt.Println("4. Return Book")
 		fmt.Println("5. List Available Books")
 		fmt.Println("6. List Borrowed Books")
-		fmt.Println("7. Exit")
+		fmt.Println("7. Reserve Book")
+		fmt.Println("8. Exit")
 		fmt.Print("Enter choice: ")
 
 		input, _ := reader.ReadString('\n')
@@ -49,6 +50,8 @@ func (c *LibraryController) Run() {
 		case "6":
 			c.listBorrowedBooks(reader)
 		case "7":
+			c.reserveBook(reader)
+		case "8":
 			fmt.Println("Goodbye!")
 			return
 		default:
@@ -138,7 +141,7 @@ func (c *LibraryController) listAvailableBooks() {
 	}
 	fmt.Println("Available Books:")
 	for _, b := range books {
-		fmt.Printf("ID: %d | Title: %s | Author: %s\n", b.ID, b.Title, b.Author)
+		fmt.Printf("ID: %d | Title: %s | Author: %s | Status: %s\n", b.ID, b.Title, b.Author, b.Status)
 	}
 }
 
@@ -160,5 +163,28 @@ func (c *LibraryController) listBorrowedBooks(reader *bufio.Reader) {
 	fmt.Println("Borrowed Books:")
 	for _, b := range books {
 		fmt.Printf("ID: %d | Title: %s | Author: %s\n", b.ID, b.Title, b.Author)
+	}
+}
+
+func (c *LibraryController) reserveBook(reader *bufio.Reader) {
+	fmt.Print("Enter Book ID to reserve: ")
+	bookStr, _ := reader.ReadString('\n')
+	bookID, _ := strconv.Atoi(strings.TrimSpace(bookStr))
+
+	fmt.Print("Enter Member ID: ")
+	memberStr, _ := reader.ReadString('\n')
+	memberID, _ := strconv.Atoi(strings.TrimSpace(memberStr))
+
+	if _, exists := c.Library.Members[memberID]; !exists {
+		fmt.Print("Enter Member Name: ")
+		name, _ := reader.ReadString('\n')
+		c.Library.Members[memberID] = &models.Member{ID: memberID, Name: strings.TrimSpace(name)}
+	}
+
+	err := c.Library.ReserveBook(bookID, memberID)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Println("Reservation request processed.")
 	}
 }
