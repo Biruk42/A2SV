@@ -1,19 +1,9 @@
-# Library Management System (Go)
+# Library Management System with Concurrency reservation
 
-## Overview
+## Workflow
 
-This is a console-based library management system implemented in Go, demonstrating:
-
-- Structs and methods
-- Interfaces
-- Slices and maps
-- Modular project organization
-
-## Features
-
-- Add / Remove books
-- Borrow and Return books
-- List available books
-- List borrowed books per member
-
-go run main.go
+1. A user calls `ReserveBook(bookID, memberID)`.
+2. The request is sent to `ReserveQueue` (a channel).
+3. A background worker processes requests concurrently.
+4. The book is marked “Reserved”.
+5. If not borrowed in 5 seconds, it automatically becomes “Available” again.
