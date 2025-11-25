@@ -11,19 +11,29 @@ import (
 )
 
 func ListTasksHandler(c *gin.Context) {
-tasks := data.ListTasks()
-c.JSON(http.StatusOK, gin.H{"tasks": tasks})
+	tasks, err := data.ListTasks(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"tasks": tasks})
 }
 
 func GetTaskHandler(c *gin.Context) {
 	id := c.Param("id")
-	t, err := data.GetTask(id)
+	t, err := data.GetTask(c, id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+		if err == data.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, t)
-}// CreateTaskHandler POST /tasks
+}
+
+// CreateTaskHandler POST /tasks
 func CreateTaskHandler(c *gin.Context) {
 	var input models.TaskInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -31,9 +41,9 @@ func CreateTaskHandler(c *gin.Context) {
 		return
 	}
 
-	task, err := data.CreateTask(input)
+	task, err := data.CreateTask(c, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, task)
@@ -48,13 +58,13 @@ func UpdateTaskHandler(c *gin.Context) {
 		return
 	}
 
-	task, err := data.UpdateTask(id, input)
+	task, err := data.UpdateTask(c, id, input)
 	if err != nil {
 		if err == data.ErrNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, task)
@@ -63,8 +73,12 @@ func UpdateTaskHandler(c *gin.Context) {
 // DeleteTaskHandler DELETE /tasks/:id
 func DeleteTaskHandler(c *gin.Context) {
 	id := c.Param("id")
-	if err := data.DeleteTask(id); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+	if err := data.DeleteTask(c, id); err != nil {
+		if err == data.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.Status(http.StatusNoContent)
