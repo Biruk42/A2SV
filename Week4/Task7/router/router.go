@@ -1,21 +1,33 @@
 package router
 
 import (
-	"github.com/gin-gonic/gin"
 	"task_manager/controllers"
+	"task_manager/middleware"
+
+	"github.com/gin-gonic/gin"
 )
 
 // SetupRouter configures routes and returns *gin.Engine
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
-	v1 := r.Group("/tasks")
+	r.POST("/register", controllers.RegisterHandler)
+	r.POST("/login", controllers.LoginHandler)
+
+	protected := r.Group("/")
+	protected.Use(middleware.AuthMiddleware())
 	{
-		v1.GET("", controllers.ListTasksHandler)
-		v1.POST("", controllers.CreateTaskHandler)
-		v1.GET(":id", controllers.GetTaskHandler)
-		v1.PUT(":id", controllers.UpdateTaskHandler)
-		v1.DELETE(":id", controllers.DeleteTaskHandler)
+		protected.GET("/tasks", controllers.ListTasksHandler)
+		protected.GET("/tasks/:id", controllers.GetTaskHandler)
+
+		admin := protected.Group("/")
+		admin.Use(middleware.AdminMiddleware())
+		{
+			admin.POST("/tasks", controllers.CreateTaskHandler)
+			admin.PUT("/tasks/:id", controllers.UpdateTaskHandler)
+			admin.DELETE("/tasks/:id", controllers.DeleteTaskHandler)
+			admin.POST("/promote", controllers.PromoteUserHandler)
+		}
 	}
 
 	return r
