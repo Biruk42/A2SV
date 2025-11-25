@@ -11,6 +11,11 @@ import (
 )
 
 func ListTasksHandler(c *gin.Context) {
+tasks := data.ListTasks()
+c.JSON(http.StatusOK, gin.H{"tasks": tasks})
+}
+
+func GetTaskHandler(c *gin.Context) {
 	id := c.Param("id")
 	t, err := data.GetTask(id)
 	if err != nil {
@@ -18,9 +23,7 @@ func ListTasksHandler(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, t)
-}
-
-// CreateTaskHandler POST /tasks
+}// CreateTaskHandler POST /tasks
 func CreateTaskHandler(c *gin.Context) {
 	var input models.TaskInput
 	if err := c.ShouldBindJSON(&input); err != nil {
