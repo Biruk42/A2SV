@@ -1,12 +1,10 @@
 package main
 
-
 import (
-"task_manager/router"
+	"task_manager/router"
 )
 
-
 func main() {
-r := router.SetupRouter()
-r.Run(":8080")
+	r := router.SetupRouter()
+	r.Run(":8080")
 }
