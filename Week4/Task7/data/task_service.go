@@ -16,10 +16,11 @@ import (
 var (
 	ErrNotFound = errors.New("task not found")
 	taskCollection *mongo.Collection
+	userCollection *mongo.Collection
 )
 
 // InitMongoDB initializes the MongoDB connection
-func InitMongoDB(uri, dbName, collectionName string) error {
+func InitMongoDB(uri, dbName string) error {
 	clientOptions := options.Client().ApplyURI(uri)
 	client, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
@@ -32,7 +33,9 @@ func InitMongoDB(uri, dbName, collectionName string) error {
 		return err
 	}
 
-	taskCollection = client.Database(dbName).Collection(collectionName)
+	db := client.Database(dbName)
+	taskCollection = db.Collection("tasks")
+	userCollection = db.Collection("users")
 	return nil
 }
 

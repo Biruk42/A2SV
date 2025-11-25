@@ -8,7 +8,7 @@ import (
 
 func main() {
 	// Initialize MongoDB
-	err := data.InitMongoDB("mongodb://localhost:27017", "task_manager", "tasks")
+	err := data.InitMongoDB("mongodb://localhost:27017", "task_manager")
 	if err != nil {
 		log.Fatal("Failed to connect to MongoDB:", err)
 	}
