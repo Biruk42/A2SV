@@ -1,54 +1,77 @@
 package data
 
 import (
+	"context"
 	"errors"
-	"sync"
 	"time"
 
 	"task_manager/models"
 
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
 	ErrNotFound = errors.New("task not found")
+	taskCollection *mongo.Collection
 )
 
-type taskStore struct {
-	mu    sync.RWMutex
-	tasks map[string]models.Task
-}
-
-var store = &taskStore{
-	tasks: make(map[string]models.Task),
-}
-
-// ListTasks
-func ListTasks() []models.Task {
-	store.mu.RLock()
-	defer store.mu.RUnlock()
-
-	res := make([]models.Task, 0, len(store.tasks))
-	for _, t := range store.tasks {
-		res = append(res, t)
+// InitMongoDB initializes the MongoDB connection
+func InitMongoDB(uri, dbName, collectionName string) error {
+	clientOptions := options.Client().ApplyURI(uri)
+	client, err := mongo.Connect(context.TODO(), clientOptions)
+	if err != nil {
+		return err
 	}
-	return res
-}
 
-// GetTask
-func GetTask(id string) (models.Task, error) {
-	store.mu.RLock()
-	defer store.mu.RUnlock()
-
-	t, ok := store.tasks[id]
-	if !ok {
-		return models.Task{}, ErrNotFound
+	// Check the connection
+	err = client.Ping(context.TODO(), nil)
+	if err != nil {
+		return err
 	}
-	return t, nil
+
+	taskCollection = client.Database(dbName).Collection(collectionName)
+	return nil
 }
 
-// CreateTask
-func CreateTask(input models.TaskInput) (models.Task, error) {
+// ListTasks retrieves all tasks from MongoDB
+func ListTasks(ctx context.Context) ([]models.Task, error) {
+	var tasks []models.Task
+	cursor, err := taskCollection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err = cursor.All(ctx, &tasks); err != nil {
+		return nil, err
+	}
+	
+	if tasks == nil {
+		tasks = []models.Task{}
+	}
+
+	return tasks, nil
+}
+
+// GetTask retrieves a specific task by ID
+func GetTask(ctx context.Context, id string) (models.Task, error) {
+	var task models.Task
+	filter := bson.M{"_id": id}
+	err := taskCollection.FindOne(ctx, filter).Decode(&task)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return models.Task{}, ErrNotFound
+		}
+		return models.Task{}, err
+	}
+	return task, nil
+}
+
+// CreateTask creates a new task
+func CreateTask(ctx context.Context, input models.TaskInput) (models.Task, error) {
 	var due time.Time
 	var err error
 	if input.DueDate != "" {
@@ -70,53 +93,67 @@ func CreateTask(input models.TaskInput) (models.Task, error) {
 		task.Status = "pending"
 	}
 
-	store.mu.Lock()
-	store.tasks[id] = task
-	store.mu.Unlock()
+	_, err = taskCollection.InsertOne(ctx, task)
+	if err != nil {
+		return models.Task{}, err
+	}
 
 	return task, nil
 }
 
-// UpdateTask
-func UpdateTask(id string, input models.TaskInput) (models.Task, error) {
-	store.mu.Lock()
-	defer store.mu.Unlock()
-
-	task, ok := store.tasks[id]
-	if !ok {
-		return models.Task{}, ErrNotFound
+// UpdateTask updates an existing task
+func UpdateTask(ctx context.Context, id string, input models.TaskInput) (models.Task, error) {
+	// First check if task exists
+	_, err := GetTask(ctx, id)
+	if err != nil {
+		return models.Task{}, err
 	}
 
+	update := bson.M{}
 	if input.Title != "" {
-		task.Title = input.Title
+		update["title"] = input.Title
 	}
 	if input.Description != "" {
-		task.Description = input.Description
+		update["description"] = input.Description
 	}
 	if input.Status != "" {
-		task.Status = input.Status
+		update["status"] = input.Status
 	}
 	if input.DueDate != "" {
 		due, err := time.Parse(time.RFC3339, input.DueDate)
 		if err != nil {
 			return models.Task{}, err
 		}
-		task.DueDate = due
+		update["due_date"] = due
 	}
 
-	store.tasks[id] = task
-	return task, nil
+	if len(update) == 0 {
+		return GetTask(ctx, id)
+	}
+
+	filter := bson.M{"_id": id}
+	updateDoc := bson.M{"$set": update}
+	
+	// Return the updated document
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var updatedTask models.Task
+	err = taskCollection.FindOneAndUpdate(ctx, filter, updateDoc, opts).Decode(&updatedTask)
+	if err != nil {
+		return models.Task{}, err
+	}
+
+	return updatedTask, nil
 }
 
-// DeleteTask
-func DeleteTask(id string) error {
-	store.mu.Lock()
-	defer store.mu.Unlock()
-
-	if _, ok := store.tasks[id]; !ok {
+// DeleteTask deletes a task
+func DeleteTask(ctx context.Context, id string) error {
+	filter := bson.M{"_id": id}
+	result, err := taskCollection.DeleteOne(ctx, filter)
+	if err != nil {
+		return err
+	}
+	if result.DeletedCount == 0 {
 		return ErrNotFound
 	}
-
-	delete(store.tasks, id)
 	return nil
 }
