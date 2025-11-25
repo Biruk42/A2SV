@@ -2,8 +2,6 @@ package controllers
 
 import (
 	"net/http"
-	"time"
-
 	"task_manager/data"
 	"task_manager/models"
 
@@ -84,11 +82,50 @@ func DeleteTaskHandler(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// helper: format time to RFC3339 when zero value should be omitted (not used directly in handlers)
-func formatIfNotZero(t time.Time) *string {
-	if t.IsZero() {
-		return nil
+func RegisterHandler(c *gin.Context) {
+	var input models.UserInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	s := t.Format(time.RFC3339)
-	return &s
+
+	if err := data.RegisterUser(c, input); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully"})
+}
+
+func LoginHandler(c *gin.Context) {
+	var input models.UserInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	token, err := data.LoginUser(c, input)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"token": token})
+}
+
+func PromoteUserHandler(c *gin.Context) {
+	var input struct {
+		Username string `json:"username" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := data.PromoteUser(c, input.Username); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User promoted successfully"})
 }
