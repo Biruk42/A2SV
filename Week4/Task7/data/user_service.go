@@ -6,6 +6,8 @@ import (
 	"task_manager/models"
 	"time"
 
+	"os"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
@@ -13,7 +15,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtSecret = []byte("your_secret_key") // In production, use environment variable
+func getJwtSecret() []byte {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return []byte("default_secret_key")
+	}
+	return []byte(secret)
+}
 
 func RegisterUser(ctx context.Context, input models.UserInput) error {
 	// Check if user exists
@@ -75,7 +83,7 @@ func LoginUser(ctx context.Context, input models.UserInput) (string, error) {
 		"exp":      time.Now().Add(time.Hour * 24).Unix(),
 	})
 
-	tokenString, err := token.SignedString(jwtSecret)
+	tokenString, err := token.SignedString(getJwtSecret())
 	if err != nil {
 		return "", err
 	}
